@@ -1305,7 +1305,7 @@ static void cull_queue(void) {
     q->favored = 0;
     q = q->next;
   }
-  //找到喜爱的种子
+  //找到q中喜爱的
   /* Let's see if anything in the bitmap isn't captured in temp_v.
      If yes, and if it has a top_rated[] contender, let's use it. */
   //找到不在map里面的
@@ -1327,7 +1327,7 @@ static void cull_queue(void) {
 	  //如果这个东西能跑到没跑过的路径那么就设置为喜爱的
       queued_favored++;
 
-      if (!top_rated[i]->was_fuzzed) pending_favored++;
+      if (!top_rated[i]->was_fuzzed) pending_favored++;//如果被fuzz过则加一
 
     }
 
@@ -2277,6 +2277,7 @@ static u8 run_target(char** argv, u32 timeout) {
      territory. */
 
   memset(trace_bits, 0, MAP_SIZE);
+  //清空trace_bits进行新的路径查找
   MEM_BARRIER();
 
   /* If we're running in "dumb" mode, we can't rely on the fork server
@@ -2285,7 +2286,7 @@ static u8 run_target(char** argv, u32 timeout) {
      init_forkserver(), but c'est la vie. */
 
   if (dumb_mode == 1 || no_forkserver) {
-
+	  //没有服务器fork一个
     child_pid = fork();
 
     if (child_pid < 0) PFATAL("fork() failed");
@@ -2404,7 +2405,7 @@ static u8 run_target(char** argv, u32 timeout) {
     s32 res;
 
     if ((res = read(fsrv_st_fd, &status, 4)) != 4) {
-
+		//从服务器读取状态信息
       if (stop_soon) return 0;
       RPFATAL(res, "Unable to communicate with fork server (OOM?)");
 
@@ -3159,7 +3160,7 @@ static u8 save_if_interesting(char** argv, void* mem, u32 len, u8 fault) {
        successful. */
 
     res = calibrate_case(argv, queue_top, mem, queue_cycle - 1, 0);
-
+	//向队列插入的操作
     if (res == FAULT_ERROR)
       FATAL("Unable to execute target application");
 
@@ -4479,22 +4480,22 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
      this. */
 
   if (q->len < 5) return 0;
-
+  //很短，不剪裁
   stage_name = tmp;
   bytes_trim_in += q->len;
 
   /* Select initial chunk len, starting with large steps. */
 
   len_p2 = next_p2(q->len);
-
+  //len*2
   remove_len = MAX(len_p2 / TRIM_START_STEPS, TRIM_MIN_BYTES);
-
+  //选择最小长度和当前长度除以16中的大值
   /* Continue until the number of steps gets too high or the stepover
      gets too small. */
 
   while (remove_len >= MAX(len_p2 / TRIM_END_STEPS, TRIM_MIN_BYTES)) {
-
-    u32 remove_pos = remove_len;
+	  //remove_len 从TRIM_START_STEPS 到TRIM_END_STEPS减小
+    u32 remove_pos = remove_len;//暂时移除长度
 
     sprintf(tmp, "trim %s/%s", DI(remove_len), DI(remove_len));
 
@@ -4502,13 +4503,13 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
     stage_max = q->len / remove_len;
 
     while (remove_pos < q->len) {
-
       u32 trim_avail = MIN(remove_len, q->len - remove_pos);
+	  //remove_len和 长度减去pos的最小值，值的意思看下面
       u32 cksum;
 
       write_with_gap(in_buf, q->len, remove_pos, trim_avail);
-
-      fault = run_target(argv, exec_tmout);
+	  //将输入指定？具体意义不明
+      fault = run_target(argv, exec_tmout);//模拟执行分析
       trim_execs++;
 
       if (stop_soon || fault == FAULT_ERROR) goto abort_trimming;
@@ -4523,15 +4524,16 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
          negatives every now and then. */
 
       if (cksum == q->exec_cksum) {
-
+		  //如果没有影响路径那么证明切片成功
         u32 move_tail = q->len - remove_pos - trim_avail;
-
+	
         q->len -= trim_avail;
-        len_p2  = next_p2(q->len);
-
-        memmove(in_buf + remove_pos, in_buf + remove_pos + trim_avail, 
+        //现在切掉可以切的部分
+		len_p2  = next_p2(q->len);
+		//计算新的长度
+	    memmove(in_buf + remove_pos, in_buf + remove_pos + trim_avail, 
                 move_tail);
-
+		//将旧的输入变为新的
         /* Let's save a clean trace, which will be needed by
            update_bitmap_score once we're done with the trimming stuff. */
 
@@ -4543,6 +4545,7 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
         }
 
       } else remove_pos += remove_len;
+	  //如果没有成功则pos加大试图切除下一块
 
       /* Since this can be slow, update the screen every now and then. */
 
@@ -4551,10 +4554,10 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
 
     }
 
-    remove_len >>= 1;
+    remove_len >>= 1;//减小remove_len
 
   }
-
+  //从大块到小块挨个切除
   /* If we have made changes to in_buf, we also need to update the on-disk
      version of the test case. */
 
@@ -4575,7 +4578,7 @@ static u8 trim_case(char** argv, struct queue_entry* q, u8* in_buf) {
     update_bitmap_score(q);
 
   }
-
+  //写入文件
 abort_trimming:
 
   bytes_trim_out += q->len;
@@ -4602,7 +4605,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   write_to_testcase(out_buf, len);
 
   fault = run_target(argv, exec_tmout);
-
+  //forkserver运行样本
   if (stop_soon) return 1;
 
   if (fault == FAULT_TMOUT) {
@@ -4628,7 +4631,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   /* This handles FAULT_ERROR for us: */
 
   queued_discovered += save_if_interesting(argv, out_buf, len, fault);
-
+  //向列表中插入新样本
   if (!(stage_cur % stats_update_freq) || stage_cur + 1 == stage_max)
     show_stats();
 
@@ -4701,10 +4704,10 @@ static u32 calculate_score(struct queue_entry* q) {
   else if (q->exec_us * 4 < avg_exec_us) perf_score = 300;
   else if (q->exec_us * 3 < avg_exec_us) perf_score = 200;
   else if (q->exec_us * 2 < avg_exec_us) perf_score = 150;
-
+  //根据执行时间进行分数划分
   /* Adjust score based on bitmap size. The working theory is that better
      coverage translates to better targets. Multiplier from 0.25x to 3x. */
-
+  //根据覆盖路径进行划分
   if (q->bitmap_size * 0.3 > avg_bitmap_size) perf_score *= 3;
   else if (q->bitmap_size * 0.5 > avg_bitmap_size) perf_score *= 2;
   else if (q->bitmap_size * 0.75 > avg_bitmap_size) perf_score *= 1.5;
@@ -4715,7 +4718,7 @@ static u32 calculate_score(struct queue_entry* q) {
   /* Adjust score based on handicap. Handicap is proportional to how late
      in the game we learned about this path. Latecomers are allowed to run
      for a bit longer until they catch up with the rest. */
-
+  //根据阻碍划分
   if (q->handicap >= 4) {
 
     perf_score *= 4;
@@ -4731,7 +4734,7 @@ static u32 calculate_score(struct queue_entry* q) {
   /* Final adjustment based on input depth, under the assumption that fuzzing
      deeper test cases is more likely to reveal stuff that can't be
      discovered with traditional fuzzers. */
-
+  //根据深度划分
   switch (q->depth) {
 
     case 0 ... 3:   break;
@@ -4969,22 +4972,22 @@ static u8 fuzz_one(char** argv) {
        cases. */
 
     if ((queue_cur->was_fuzzed || !queue_cur->favored) &&
-        UR(100) < SKIP_TO_NEW_PROB) return 1;
+        UR(100) < SKIP_TO_NEW_PROB) return 1;//如果没fuzz的喜欢队列，当前队列已经fuzz过或者不喜欢，跳过99%
 
   } else if (!dumb_mode && !queue_cur->favored && queued_paths > 10) {
-
+	  //不受欢迎或者队列过多
     /* Otherwise, still possibly skip non-favored cases, albeit less often.
        The odds of skipping stuff are higher for already-fuzzed inputs and
        lower for never-fuzzed entries. */
 
     if (queue_cycle > 1 && !queue_cur->was_fuzzed) {
-
+		//同时没fuzz过，找到多个crash
       if (UR(100) < SKIP_NFAV_NEW_PROB) return 1;
-
+	  //75不喜欢又没fuzz的
     } else {
-
+		//fuzz过或者少于1个crash
       if (UR(100) < SKIP_NFAV_OLD_PROB) return 1;
-
+	  //95不喜欢又fuzz的
     }
 
   }
@@ -5000,13 +5003,13 @@ static u8 fuzz_one(char** argv) {
   /* Map the test case into memory. */
 
   fd = open(queue_cur->fname, O_RDONLY);
-
+  //打开队列
   if (fd < 0) PFATAL("Unable to open '%s'", queue_cur->fname);
 
   len = queue_cur->len;
 
   orig_in = in_buf = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-
+  //读出内存
   if (orig_in == MAP_FAILED) PFATAL("Unable to mmap '%s'", queue_cur->fname);
 
   close(fd);
@@ -5044,15 +5047,15 @@ static u8 fuzz_one(char** argv) {
     }
 
   }
-
+  //什么失败处理，没看明白
   /************
    * TRIMMING *
    ************/
-
+  //剪裁模块
   if (!dumb_mode && !queue_cur->trim_done) {
 
     u8 res = trim_case(argv, queue_cur, in_buf);
-
+	//具体剪裁的函数
     if (res == FAULT_ERROR)
       FATAL("Unable to execute target application");
 
@@ -5076,7 +5079,7 @@ static u8 fuzz_one(char** argv) {
    *********************/
 
   orig_perf = perf_score = calculate_score(queue_cur);
-
+  //打分机制
   /* Skip right away if -d is given, if we have done deterministic fuzzing on
      this entry ourselves (was_fuzzed), or if it has gone through deterministic
      testing in earlier, resumed runs (passed_det). */
@@ -5095,17 +5098,17 @@ static u8 fuzz_one(char** argv) {
   /*********************************************
    * SIMPLE BITFLIP (+dictionary construction) *
    *********************************************/
-
+  //进行具体的变异，整个afl中最重要的部分
 #define FLIP_BIT(_ar, _b) do { \
     u8* _arf = (u8*)(_ar); \
     u32 _bf = (_b); \
     _arf[(_bf) >> 3] ^= (128 >> ((_bf) & 7)); \
   } while (0)
-
+  //某个块翻转指定位的函数
   /* Single walking bit. */
 
   stage_short = "flip1";
-  stage_max   = len << 3;
+  stage_max   = len << 3;//因为一字节有8位
   stage_name  = "bitflip 1/1";
 
   stage_val_type = STAGE_VAL_NONE;
@@ -5118,11 +5121,12 @@ static u8 fuzz_one(char** argv) {
 
     stage_cur_byte = stage_cur >> 3;
 
-    FLIP_BIT(out_buf, stage_cur);
+    FLIP_BIT(out_buf, stage_cur);//翻转
 
-    if (common_fuzz_stuff(argv, out_buf, len)) goto abandon_entry;
+    if (common_fuzz_stuff(argv, out_buf, len)) goto abandon_entry;//测试，如果产生了好的样本，就加入队列
 
     FLIP_BIT(out_buf, stage_cur);
+	//改回来如果不好
 
     /* While flipping the least significant bit in every byte, pull of an extra
        trick to detect possible syntax tokens. In essence, the idea is that if
@@ -5167,7 +5171,7 @@ static u8 fuzz_one(char** argv) {
           maybe_add_auto(a_collect, a_len);
 
       } else if (cksum != prev_cksum) {
-
+		  //检查新的测试是不是对路径有变化
         /* Otherwise, if the checksum has changed, see if we have something
            worthwhile queued up, and collect that if the answer is yes. */
 
@@ -5263,7 +5267,7 @@ static u8 fuzz_one(char** argv) {
      EFF_SPAN_ALEN - map span for a sequence of bytes.
 
    */
-
+  //effector map启发式判断（如果怎么翻转都没反应有时就不管他了）
 #define EFF_APOS(_p)          ((_p) >> EFF_MAP_SCALE2)
 #define EFF_REM(_x)           ((_x) & ((1 << EFF_MAP_SCALE2) - 1))
 #define EFF_ALEN(_l)          (EFF_APOS(_l) + !!EFF_REM(_l))
@@ -5274,7 +5278,6 @@ static u8 fuzz_one(char** argv) {
 
   eff_map    = ck_alloc(EFF_ALEN(len));
   eff_map[0] = 1;
-
   if (EFF_APOS(len - 1) != 0) {
     eff_map[EFF_APOS(len - 1)] = 1;
     eff_cnt++;
@@ -5323,7 +5326,7 @@ static u8 fuzz_one(char** argv) {
     out_buf[stage_cur] ^= 0xFF;
 
   }
-
+  //一字节一字节的翻转
   /* If the effector map is more than EFF_MAX_PERC dense, just flag the
      whole thing as worth fuzzing, since we wouldn't be saving much time
      anyway. */
@@ -5428,7 +5431,7 @@ skip_bitflip:
   /**********************
    * ARITHMETIC INC/DEC *
    **********************/
-
+  //加减测试阶段
   /* 8-bit arithmetics. */
 
   stage_name  = "arith 8/8";
@@ -5447,7 +5450,7 @@ skip_bitflip:
     /* Let's consult the effector map... */
 
     if (!eff_map[EFF_APOS(i)]) {
-      stage_max -= 2 * ARITH_MAX;
+      stage_max -= 2 * ARITH_MAX;//减去无效块
       continue;
     }
 
@@ -5456,7 +5459,7 @@ skip_bitflip:
     for (j = 1; j <= ARITH_MAX; j++) {
 
       u8 r = orig ^ (orig + j);
-
+	  //加后xor
       /* Do arithmetic operations only if the result couldn't be a product
          of a bitflip. */
 
@@ -5464,19 +5467,19 @@ skip_bitflip:
 
         stage_cur_val = j;
         out_buf[i] = orig + j;
-
+		//加
         if (common_fuzz_stuff(argv, out_buf, len)) goto abandon_entry;
         stage_cur++;
 
       } else stage_max--;
 
       r =  orig ^ (orig - j);
-
+	  //减后xor
       if (!could_be_bitflip(r)) {
 
         stage_cur_val = -j;
         out_buf[i] = orig - j;
-
+		//减
         if (common_fuzz_stuff(argv, out_buf, len)) goto abandon_entry;
         stage_cur++;
 
@@ -5492,7 +5495,7 @@ skip_bitflip:
 
   stage_finds[STAGE_ARITH8]  += new_hit_cnt - orig_hit_cnt;
   stage_cycles[STAGE_ARITH8] += stage_max;
-
+  
   /* 16-bit arithmetics, both endians. */
 
   if (len < 2) goto skip_arith;
@@ -5523,7 +5526,7 @@ skip_bitflip:
           r2 = orig ^ (orig - j),
           r3 = orig ^ SWAP16(SWAP16(orig) + j),
           r4 = orig ^ SWAP16(SWAP16(orig) - j);
-
+	  //无论什么顺序都算了
       /* Try little endian addition and subtraction first. Do it only
          if the operation would affect more than one byte (hence the 
          & 0xff overflow checks) and if it couldn't be a product of
@@ -5684,7 +5687,7 @@ skip_arith:
   /**********************
    * INTERESTING VALUES *
    **********************/
-
+ //interet阶段
   stage_name  = "interest 8/8";
   stage_short = "int8";
   stage_cur   = 0;
@@ -5730,7 +5733,7 @@ skip_arith:
     }
 
   }
-
+  //用intersting_8进行替换
   new_hit_cnt = queued_paths + unique_crashes;
 
   stage_finds[STAGE_INTEREST8]  += new_hit_cnt - orig_hit_cnt;
@@ -5919,7 +5922,7 @@ skip_interest:
         continue;
 
       }
-
+	  //概率性跳过
       last_len = extras[j].len;
       memcpy(out_buf + i, extras[j].data, last_len);
 
@@ -5931,7 +5934,7 @@ skip_interest:
 
     /* Restore all the clobbered memory. */
     memcpy(out_buf + i, in_buf + i, last_len);
-
+	//添加
   }
 
   new_hit_cnt = queued_paths + unique_crashes;
@@ -6466,8 +6469,19 @@ havoc_stage:
           }
 
       }
-
-    }
+	  //随机大破坏
+	  /*
+	  filp
+	  interesting
+		  hide + -
+		  hiderandom
+		  hidedelete
+		  hideclone insert
+		  hideoverwrite block
+		  hideoverwrite extra
+		  insert extra
+    */
+	}
 
     if (common_fuzz_stuff(argv, out_buf, temp_len))
       goto abandon_entry;
@@ -6515,7 +6529,7 @@ havoc_stage:
      It takes the current input file, randomly selects another input, and
      splices them together at some offset, then relies on the havoc
      code to mutate that blob. */
-
+  //文件拼接
 retry_splicing:
 
   if (use_splicing && splice_cycle++ < SPLICE_CYCLES &&
@@ -6541,12 +6555,12 @@ retry_splicing:
 
     splicing_with = tid;
     target = queue;
-
+	//随机选择文件
     while (tid >= 100) { target = target->next_100; tid -= 100; }
     while (tid--) target = target->next;
 
     /* Make sure that the target has a reasonable length. */
-
+	
     while (target && (target->len < 2 || target == queue_cur)) {
       target = target->next;
       splicing_with++;
@@ -6563,7 +6577,7 @@ retry_splicing:
     new_buf = ck_alloc_nozero(target->len);
 
     ck_read(fd, new_buf, target->len, target->fname);
-
+	//读进来
     close(fd);
 
     /* Find a suitable splicing location, somewhere between the first and
@@ -6571,7 +6585,7 @@ retry_splicing:
        byte or so. */
 
     locate_diffs(in_buf, new_buf, MIN(len, target->len), &f_diff, &l_diff);
-
+	//查找相同性
     if (f_diff < 0 || l_diff < 2 || f_diff == l_diff) {
       ck_free(new_buf);
       goto retry_splicing;
@@ -6582,7 +6596,7 @@ retry_splicing:
     split_at = f_diff + UR(l_diff - f_diff);
 
     /* Do the thing. */
-
+	//把多个文件拼接
     len = target->len;
     memcpy(new_buf, in_buf, split_at);
     in_buf = new_buf;
@@ -6607,7 +6621,7 @@ abandon_entry:
      cycle and have not seen this entry before. */
 
   if (!stop_soon && !queue_cur->cal_failed && !queue_cur->was_fuzzed) {
-    queue_cur->was_fuzzed = 1;
+    queue_cur->was_fuzzed = 1;//用过
     pending_not_fuzzed--;
     if (queue_cur->favored) pending_favored--;
   }
@@ -8021,9 +8035,9 @@ int main(int argc, char** argv) {
         seek_to--;
         queue_cur = queue_cur->next;
       }
-
+	//找一个，seek_to就少了，列表向后，queue_cur为找到的队列
       show_stats();
-
+	  //展现当前状态
       if (not_on_tty) {
         ACTF("Entering queue cycle %llu.", queue_cycle);
         fflush(stdout);
@@ -8037,16 +8051,16 @@ int main(int argc, char** argv) {
         if (use_splicing) cycles_wo_finds++; else use_splicing = 1;
 
       } else cycles_wo_finds = 0;
-
+	  //一轮了使用 splice
       prev_queued = queued_paths;
-
+	  
       if (sync_id && queue_cycle == 1 && getenv("AFL_IMPORT_FIRST"))
         sync_fuzzers(use_argv);
 
     }
 
     skipped_fuzz = fuzz_one(use_argv);
-
+	//开始进行变异
     if (!stop_soon && sync_id && !skipped_fuzz) {
       
       if (!(sync_interval_cnt++ % SYNC_INTERVAL))
@@ -8060,6 +8074,7 @@ int main(int argc, char** argv) {
 
     queue_cur = queue_cur->next;
     current_entry++;
+	//添加有趣的样本
 
   }
 
