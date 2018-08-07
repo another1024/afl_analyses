@@ -86,7 +86,7 @@ static u8   use_64bit = 0;
    to keep the code simple. */
 
 static void edit_params(int argc, char** argv) {
-
+	//进行解析头文件中找汇编代码
   u8 *tmp_dir = getenv("TMPDIR"), *afl_as = getenv("AFL_AS");
   u32 i;
 
@@ -217,7 +217,7 @@ wrap_things_up:
    the appropriate places. */
 
 static void add_instrumentation(void) {
-
+	//插桩函数
   static u8 line[MAX_LINE];
 
   FILE* inf;
@@ -261,7 +261,7 @@ static void add_instrumentation(void) {
 
       fprintf(outf, use_64bit ? trampoline_fmt_64 : trampoline_fmt_32,
               R(MAP_SIZE));
-
+	  //插的动作
       instrument_next = 0;
       ins_lines++;
 

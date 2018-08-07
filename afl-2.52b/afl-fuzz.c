@@ -1124,7 +1124,7 @@ static const u8 count_class_lookup8[256] = {
   [128 ... 255] = 128
 
 };
-
+//用来映射的桶
 static u16 count_class_lookup16[65536];
 
 
@@ -1234,7 +1234,7 @@ static void minimize_bits(u8* dst, u8* src) {
    contender, or if the contender has a more favorable speed x size factor. */
 
 static void update_bitmap_score(struct queue_entry* q) {
-
+	//更新分数模块
   u32 i;
   u64 fav_factor = q->exec_us * q->len;
 
@@ -1244,13 +1244,13 @@ static void update_bitmap_score(struct queue_entry* q) {
   for (i = 0; i < MAP_SIZE; i++)
 
     if (trace_bits[i]) {
-
+		//trace_bits是与fork共享得到的bitmap，如果这个bitmap跑到了
        if (top_rated[i]) {
-
+		   //比较和原来的哪个好
          /* Faster-executing or smaller test cases are favored. */
 
          if (fav_factor > top_rated[i]->exec_us * top_rated[i]->len) continue;
-
+		 //从长度与时间
          /* Looks like we're going to win. Decrease ref count for the
             previous winner, discard its trace_bits[] if necessary. */
 
@@ -1978,7 +1978,7 @@ static void destroy_extras(void) {
    through a pipe. The other part of this logic is in afl-as.h. */
 
 EXP_ST void init_forkserver(char** argv) {
-
+	//创建forkserver
   static struct itimerval it;
   int st_pipe[2], ctl_pipe[2];
   int status;
@@ -2090,7 +2090,7 @@ EXP_ST void init_forkserver(char** argv) {
                            "msan_track_origins=0", 0);
 
     execv(target_path, argv);
-
+	//运行forkserver，代码插桩到程序里，看afl-as里面跳到afl-as.h里的汇编代码
     /* Use a distinctive bitmap signature to tell the parent about execv()
        falling through. */
 

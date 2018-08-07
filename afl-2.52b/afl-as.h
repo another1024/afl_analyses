@@ -117,7 +117,7 @@ static const u8* trampoline_fmt_32 =
   "movl %%ecx,  8(%%esp)\n"
   "movl %%eax, 12(%%esp)\n"
   "movl $0x%08x, %%ecx\n"
-  "call __afl_maybe_log\n"
+  "call __afl_maybe_log\n"//主要调用这个函数
   "movl 12(%%esp), %%eax\n"
   "movl  8(%%esp), %%ecx\n"
   "movl  4(%%esp), %%edx\n"
@@ -180,7 +180,7 @@ static const u8* main_payload_32 =
   "  movl __afl_prev_loc, %edi\n"
   "  xorl %ecx, %edi\n"
   "  shrl $1, %ecx\n"
-  "  movl %ecx, __afl_prev_loc\n"
+  "  movl %ecx, __afl_prev_loc\n"         //异或找到bitmap
 #else
   "  movl %ecx, %edi\n"
 #endif /* ^!COVERAGE_ONLY */
@@ -225,8 +225,8 @@ static const u8* main_payload_32 =
   "  addl  $4, %esp\n"
   "\n"
   "  pushl $0          /* shmat flags    */\n"
-  "  pushl $0          /* requested addr */\n"
-  "  pushl %eax        /* SHM ID         */\n"
+  "  pushl $0          /* requested addr */\n"//加载由主程序申请的共享内存给所有fork的子程序与第一个fork的server通信用
+  "  pushl %eax        /* SHM ID         */\n"//然后把地址加载到环境中，方便所有程序使用
   "  call  shmat\n"
   "  addl  $12, %esp\n"
   "\n"
@@ -261,7 +261,7 @@ static const u8* main_payload_32 =
   "  addl  $12, %esp\n"
   "\n"
   "  cmpl  $4, %eax\n"
-  "  jne   __afl_fork_resume\n"
+  "  jne   __afl_fork_resume\n"   //跳到fork的子进程如果server已经启动
   "\n"
   "__afl_fork_wait_loop:\n"
   "\n"
@@ -281,7 +281,7 @@ static const u8* main_payload_32 =
   "     caches getpid() results and offers no way to update the value, breaking\n"
   "     abort(), raise(), and a bunch of other things :-( */\n"
   "\n"
-  "  call fork\n"
+  "  call fork\n"//接收信息后fork一个子进程，然后用管道与afl-fuzz通信
   "\n"
   "  cmpl $0, %eax\n"
   "  jl   __afl_die\n"
@@ -300,7 +300,7 @@ static const u8* main_payload_32 =
   "  pushl $0             /* no flags  */\n"
   "  pushl $__afl_temp    /* status    */\n"
   "  pushl __afl_fork_pid /* PID       */\n"
-  "  call  waitpid\n"
+  "  call  waitpid\n"//等待子进程
   "  addl  $12, %esp\n"
   "\n"
   "  cmpl  $0, %eax\n"
